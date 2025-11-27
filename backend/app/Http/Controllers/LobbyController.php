@@ -21,6 +21,16 @@ class LobbyController extends Controller
         ]);
     }
 
+        public function getPlayers($lobbyId)
+    {
+        $players = \App\Models\Player::where('lobby_id', $lobbyId)->get();
+
+        return response()->json([
+            'players' => $players
+        ]);
+    }
+
+
     public function joinLobby(Request $request, $code)
     {
         $request->validate([

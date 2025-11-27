@@ -12,6 +12,9 @@ use App\Http\Controllers\QuestionController;
 Route::post('/lobby/create', [LobbyController::class, 'createLobby']);
 Route::post('/lobby/{code}/join', [LobbyController::class, 'joinLobby']);
 
+// Get players in lobby
+Route::get('/lobby/{lobbyId}/players', [LobbyController::class, 'getPlayers']);
+
 // Game
 Route::post('/game/{lobbyId}/start', [GameController::class, 'startGame']);
 Route::get('/game/player/{playerId}/state', [GameController::class, 'getState']);
