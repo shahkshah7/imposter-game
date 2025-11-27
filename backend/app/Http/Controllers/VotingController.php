@@ -4,8 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Models\Vote;
 use App\Models\Round;
-use App\Models\Player;
 use Illuminate\Http\Request;
+
+// ADD EVENT:
+use App\Events\VoteSubmitted;
 
 class VotingController extends Controller
 {
@@ -27,7 +29,12 @@ class VotingController extends Controller
             'target_id' => $request->target_id,
         ]);
 
-        return response()->json(['vote' => $vote]);
+        // 🚀 BROADCAST EVENT
+        event(new VoteSubmitted($vote));
+
+        return response()->json([
+            'vote' => $vote
+        ]);
     }
 
     public function results($roundId)
