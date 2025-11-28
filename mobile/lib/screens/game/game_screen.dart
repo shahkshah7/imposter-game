@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:imposter_game/models/player.dart';
 import 'package:imposter_game/models/lobby.dart';
 import 'package:imposter_game/models/question.dart';
-import 'package:imposter_game/services/game_service.dart';
 import 'package:imposter_game/services/question_service.dart';
 import 'package:imposter_game/screens/game/widgets/ask_question_dialog.dart';
 import 'package:pusher_channels_flutter/pusher_channels_flutter.dart';
 import 'package:imposter_game/services/websocket_service.dart';
 import 'package:imposter_game/screens/game/widgets/answer_dialog.dart';
+import 'package:imposter_game/screens/game/voting_screen.dart';
 
 class GameScreen extends StatefulWidget {
   final Player player;
@@ -29,51 +29,80 @@ class _GameScreenState extends State<GameScreen> {
   List<Question> _questions = [];
   bool _loading = true;
 
+  // -----------------------------
+  // FEATURE B – Answer popup logic
+  // -----------------------------
   void _checkForAnswerPopup() {
-  // Look for a question where YOU are the target and has no answer
-  for (var q in _questions) {
-    final bool isTarget = q.target == widget.player.name;
-    final bool noAnswer = q.answer == null && q.hasAnswer == false;
+    for (var q in _questions) {
+      final bool isTarget = q.target == widget.player.name;
+      final bool noAnswer = q.answer == null && q.hasAnswer == false;
 
-    if (isTarget && noAnswer) {
-      // Open answer popup
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (_) => AnswerDialog(
-          question: q,
-          onAnswered: _loadQuestions,
-        ),
-      );
-      break; // Prevent multiple popups
+      if (isTarget && noAnswer) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => AnswerDialog(
+            question: q,
+            onAnswered: _loadQuestions,
+          ),
+        );
+        break;
+      }
     }
   }
-}
 
+  // -----------------------------
+  // FEATURE C – Vote screen navigation
+  // -----------------------------
+  void _goToVotingScreen() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => VotingScreen(
+          roundId: widget.roundId,
+          player: widget.player,
+          lobbyId: widget.lobby.id,
+        ),
+      ),
+    );
+  }
 
   @override
   void initState() {
     super.initState();
 
-    // Subscribe to WebSocket channel "lobby.<id>"
+    // WebSocket subscription for real-time updates
     WebSocketService.subscribeToLobby(
       widget.lobby.id,
       (PusherEvent event) {
-        // Debugging (optional)
-        print("WebSocket EVENT: ${event.eventName}");
-        print("Data: ${event.data}");
+        print("🔥 WebSocket EVENT: ${event.eventName}");
+        print("📦 Data: ${event.data}");
 
-        // Reload questions whenever ANY event happens
+        // Handle VotePhaseStarted
+        if (event.eventName == "App\\Events\\VotePhaseStarted") {
+          print("🚨 Vote phase started — navigating to voting screen");
+          _goToVotingScreen();
+          return;
+        }
+
+        // Handle QuestionAsked / QuestionAnswered
+        if (event.eventName == "App\\Events\\QuestionAsked" ||
+            event.eventName == "App\\Events\\QuestionAnswered") {
+          _loadQuestions();
+          return;
+        }
+
+        // Fallback: reload questions on any unexpected event
         _loadQuestions();
       },
     );
 
+    // Initial load
     _loadQuestions();
   }
 
   @override
   void dispose() {
-    // Unsubscribe when leaving screen
     WebSocketService.unsubscribeFromLobby(widget.lobby.id);
     super.dispose();
   }
@@ -89,10 +118,8 @@ class _GameScreenState extends State<GameScreen> {
       _loading = false;
     });
 
-    // Check if YOU need to answer something
     _checkForAnswerPopup();
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -101,7 +128,7 @@ class _GameScreenState extends State<GameScreen> {
         title: Text("Your word: ${widget.player.word ?? ''}"),
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => _openAskQuestionDialog(),
+        onPressed: _openAskQuestionDialog,
         child: const Icon(Icons.help_outline),
       ),
       body: _loading
@@ -148,5 +175,4 @@ class _GameScreenState extends State<GameScreen> {
       },
     );
   }
-
 }
