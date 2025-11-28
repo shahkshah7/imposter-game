@@ -4,6 +4,9 @@ import 'package:imposter_game/models/lobby.dart';
 import 'package:imposter_game/models/question.dart';
 import 'package:imposter_game/services/game_service.dart';
 import 'package:imposter_game/services/question_service.dart';
+import 'package:imposter_game/screens/game/widgets/ask_question_dialog.dart';
+import 'package:pusher_channels_flutter/pusher_channels_flutter.dart';
+import 'package:imposter_game/services/websocket_service.dart';
 
 class GameScreen extends StatefulWidget {
   final Player player;
@@ -28,7 +31,28 @@ class _GameScreenState extends State<GameScreen> {
   @override
   void initState() {
     super.initState();
+
+    // Subscribe to WebSocket channel "lobby.<id>"
+    WebSocketService.subscribeToLobby(
+      widget.lobby.id,
+      (PusherEvent event) {
+        // Debugging (optional)
+        print("WebSocket EVENT: ${event.eventName}");
+        print("Data: ${event.data}");
+
+        // Reload questions whenever ANY event happens
+        _loadQuestions();
+      },
+    );
+
     _loadQuestions();
+  }
+
+  @override
+  void dispose() {
+    // Unsubscribe when leaving screen
+    WebSocketService.unsubscribeFromLobby(widget.lobby.id);
+    super.dispose();
   }
 
   Future<void> _loadQuestions() async {
@@ -49,12 +73,10 @@ class _GameScreenState extends State<GameScreen> {
       appBar: AppBar(
         title: Text("Your word: ${widget.player.word ?? ''}"),
       ),
-
       floatingActionButton: FloatingActionButton(
         onPressed: () => _openAskQuestionDialog(),
         child: const Icon(Icons.help_outline),
       ),
-
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : ListView.builder(
@@ -87,60 +109,17 @@ class _GameScreenState extends State<GameScreen> {
   }
 
   void _openAskQuestionDialog() {
-    final controller = TextEditingController();
-    int? selectedTargetId;
-
     showDialog(
       context: context,
       builder: (context) {
-        return AlertDialog(
-          title: const Text("Ask a question"),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: controller,
-                decoration:
-                    const InputDecoration(labelText: "Enter question"),
-              ),
-
-              const SizedBox(height: 10),
-
-              DropdownButton<int>(
-                value: selectedTargetId,
-                hint: const Text("Select target player"),
-                isExpanded: true,
-                items: [
-                  // TODO: Add player list
-                ],
-                onChanged: (value) {
-                  setState(() {
-                    selectedTargetId = value;
-                  });
-                },
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () async {
-                if (selectedTargetId == null) return;
-
-                await QuestionService.askQuestion(
-                  widget.roundId,
-                  widget.player.id,
-                  selectedTargetId!,
-                  controller.text.trim(),
-                );
-
-                Navigator.pop(context);
-                _loadQuestions();
-              },
-              child: const Text("Send"),
-            )
-          ],
+        return AskQuestionDialog(
+          lobbyId: widget.lobby.id,
+          roundId: widget.roundId,
+          currentPlayer: widget.player,
+          onQuestionSent: _loadQuestions,
         );
       },
     );
   }
+
 }
