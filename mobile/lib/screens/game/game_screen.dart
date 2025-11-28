@@ -7,6 +7,7 @@ import 'package:imposter_game/services/question_service.dart';
 import 'package:imposter_game/screens/game/widgets/ask_question_dialog.dart';
 import 'package:pusher_channels_flutter/pusher_channels_flutter.dart';
 import 'package:imposter_game/services/websocket_service.dart';
+import 'package:imposter_game/screens/game/widgets/answer_dialog.dart';
 
 class GameScreen extends StatefulWidget {
   final Player player;
@@ -27,6 +28,28 @@ class GameScreen extends StatefulWidget {
 class _GameScreenState extends State<GameScreen> {
   List<Question> _questions = [];
   bool _loading = true;
+
+  void _checkForAnswerPopup() {
+  // Look for a question where YOU are the target and has no answer
+  for (var q in _questions) {
+    final bool isTarget = q.target == widget.player.name;
+    final bool noAnswer = q.answer == null && q.hasAnswer == false;
+
+    if (isTarget && noAnswer) {
+      // Open answer popup
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => AnswerDialog(
+          question: q,
+          onAnswered: _loadQuestions,
+        ),
+      );
+      break; // Prevent multiple popups
+    }
+  }
+}
+
 
   @override
   void initState() {
@@ -65,7 +88,11 @@ class _GameScreenState extends State<GameScreen> {
       _questions = q;
       _loading = false;
     });
+
+    // Check if YOU need to answer something
+    _checkForAnswerPopup();
   }
+
 
   @override
   Widget build(BuildContext context) {
