@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io' show Platform;
 
 import 'package:pusher_channels_flutter/pusher_channels_flutter.dart';
 
@@ -7,9 +8,10 @@ class WebSocketService {
       PusherChannelsFlutter.getInstance();
   static PusherChannel? _channel;
   static bool _initialized = false;
+  static bool get _enabled => !Platform.isIOS;
 
   static Future<void> init() async {
-    if (_initialized) return;
+    if (!_enabled || _initialized) return;
 
     try {
       await _pusher.init(
@@ -38,6 +40,7 @@ class WebSocketService {
     int lobbyId,
     void Function(PusherEvent event) onEvent,
   ) async {
+    if (!_enabled) return;
     await init();
 
     final channelName = "lobby.$lobbyId";
@@ -45,14 +48,13 @@ class WebSocketService {
     _channel = await _pusher.subscribe(
       channelName: channelName,
       onEvent: (event) {
-        final normalizedData = _decodeData(event.data);
-        final normalizedEvent = PusherEvent(
+        final data = _decode(event.data);
+        onEvent(PusherEvent(
           channelName: event.channelName,
           eventName: event.eventName,
-          data: normalizedData,
+          data: data,
           userId: event.userId,
-        );
-        onEvent(normalizedEvent);
+        ));
       },
     );
 
@@ -63,6 +65,7 @@ class WebSocketService {
     required String eventName,
     required Map<String, dynamic> data,
   }) async {
+    if (!_enabled) return;
     if (_channel == null) return;
 
     final channelName = _channel!.channelName;
@@ -99,21 +102,26 @@ class WebSocketService {
     required bool isAnswering,
   }) async {
     await _clientEvent(
-      eventName: isAnswering ? "client-answering-start" : "client-answering-stop",
+      eventName:
+          isAnswering ? "client-answering-start" : "client-answering-stop",
       data: {"player": playerName},
     );
   }
 
   static Future<void> unsubscribeFromLobby(int lobbyId) async {
-    final channelName = "lobby.$lobbyId";
+    if (!_enabled) return;
+    final name = "lobby.$lobbyId";
+
     if (_channel != null) {
-      await _pusher.unsubscribe(channelName: channelName);
+      await _pusher.unsubscribe(channelName: name);
       _channel = null;
     }
-    print("Unsubscribed from $channelName");
+
+    print("Unsubscribed from $name");
   }
 
-  static dynamic _decodeData(dynamic data) {
+  static dynamic _decode(dynamic data) {
+    if (data == null) return null;
     if (data is String) {
       try {
         return jsonDecode(data);

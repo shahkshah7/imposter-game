@@ -36,9 +36,11 @@ dependencies:
   # Use with the CupertinoIcons class for iOS style icons.
   
   dio: ^5.4.0
-  pusher_channels_flutter: ^2.5.0
+
 
   cupertino_icons: ^1.0.8
+  pusher_channels_flutter:
+    path: plugins/pusher_channels_flutter
 
 dev_dependencies:
   flutter_test:
