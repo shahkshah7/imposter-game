@@ -1,3 +1,5 @@
+import 'dart:io' show Platform;
+
 import 'package:flutter/material.dart';
 import 'package:imposter_game/models/player.dart';
 import 'package:imposter_game/models/lobby.dart';
@@ -8,6 +10,7 @@ import 'package:pusher_channels_flutter/pusher_channels_flutter.dart';
 import 'package:imposter_game/services/websocket_service.dart';
 import 'package:imposter_game/screens/game/widgets/answer_dialog.dart';
 import 'package:imposter_game/screens/game/voting_screen.dart';
+import 'package:imposter_game/screens/game/widgets/typing_indicator.dart';
 
 class GameScreen extends StatefulWidget {
   final Player player;
@@ -29,9 +32,10 @@ class _GameScreenState extends State<GameScreen> {
   List<Question> _questions = [];
   bool _loading = true;
 
-  // -----------------------------
-  // FEATURE B – Answer popup logic
-  // -----------------------------
+  String? _currentlyTypingPlayer;
+  String? _currentlyAnsweringPlayer;
+
+  // ANSWER POPUP
   void _checkForAnswerPopup() {
     for (var q in _questions) {
       final bool isTarget = q.target == widget.player.name;
@@ -51,9 +55,7 @@ class _GameScreenState extends State<GameScreen> {
     }
   }
 
-  // -----------------------------
-  // FEATURE C – Vote screen navigation
-  // -----------------------------
+  // VOTING
   void _goToVotingScreen() {
     Navigator.push(
       context,
@@ -71,39 +73,82 @@ class _GameScreenState extends State<GameScreen> {
   void initState() {
     super.initState();
 
-    // WebSocket subscription for real-time updates
-    WebSocketService.subscribeToLobby(
-      widget.lobby.id,
-      (PusherEvent event) {
-        print("🔥 WebSocket EVENT: ${event.eventName}");
-        print("📦 Data: ${event.data}");
+    if (Platform.isAndroid || Platform.isIOS) {
+      WebSocketService.subscribeToLobby(
+        widget.lobby.id,
+        (PusherEvent event) {
+          print("WebSocket EVENT: ${event.eventName}");
+          print("DATA: ${event.data}");
 
-        // Handle VotePhaseStarted
-        if (event.eventName == "App\\Events\\VotePhaseStarted") {
-          print("🚨 Vote phase started — navigating to voting screen");
-          _goToVotingScreen();
-          return;
-        }
+          // ---------------- VOTE PHASE ----------------
+          if (event.eventName == "App\\Events\\VotePhaseStarted") {
+            _goToVotingScreen();
+            return;
+          }
 
-        // Handle QuestionAsked / QuestionAnswered
-        if (event.eventName == "App\\Events\\QuestionAsked" ||
-            event.eventName == "App\\Events\\QuestionAnswered") {
+          // ---------------- TYPING START ----------------
+          if (event.eventName == "typing.start") {
+            final data = event.data;
+            if (data["player"] != widget.player.name) {
+              setState(() => _currentlyTypingPlayer = data["player"]);
+            }
+            return;
+          }
+
+          // ---------------- TYPING STOP ----------------
+          if (event.eventName == "typing.stop") {
+            final data = event.data;
+            if (_currentlyTypingPlayer == data["player"]) {
+              setState(() => _currentlyTypingPlayer = null);
+            }
+            return;
+          }
+
+          // ---------------- ANSWERING START ----------------
+          if (event.eventName == "answering.start") {
+            final data = event.data;
+
+            if (data["player"] != widget.player.name) {
+              setState(() => _currentlyAnsweringPlayer = data["player"]);
+            }
+
+            // hide typing indicator during answer
+            setState(() => _currentlyTypingPlayer = null);
+            return;
+          }
+
+          // ---------------- ANSWERING STOP ----------------
+          if (event.eventName == "answering.stop") {
+            final data = event.data;
+
+            if (_currentlyAnsweringPlayer == data["player"]) {
+              setState(() => _currentlyAnsweringPlayer = null);
+            }
+
+            return;
+          }
+
+          // ---------------- QUESTION ASKED / ANSWERED ----------------
+          if (event.eventName == "App\\Events\\QuestionAsked" ||
+              event.eventName == "App\\Events\\QuestionAnswered") {
+            _loadQuestions();
+            return;
+          }
+
+          // fallback
           _loadQuestions();
-          return;
-        }
+        },
+      );
+    }
 
-        // Fallback: reload questions on any unexpected event
-        _loadQuestions();
-      },
-    );
-
-    // Initial load
     _loadQuestions();
   }
 
   @override
   void dispose() {
-    WebSocketService.unsubscribeFromLobby(widget.lobby.id);
+    if (Platform.isAndroid || Platform.isIOS) {
+      WebSocketService.unsubscribeFromLobby(widget.lobby.id);
+    }
     super.dispose();
   }
 
@@ -128,36 +173,73 @@ class _GameScreenState extends State<GameScreen> {
         title: Text("Your word: ${widget.player.word ?? ''}"),
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: _openAskQuestionDialog,
+        onPressed: _currentlyAnsweringPlayer == null
+            ? _openAskQuestionDialog
+            : null,
         child: const Icon(Icons.help_outline),
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : ListView.builder(
-              itemCount: _questions.length,
-              itemBuilder: (context, index) {
-                final q = _questions[index];
-
-                return ListTile(
-                  title: Text("${q.asker} → ${q.target}"),
-                  subtitle: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(q.text),
-                      if (q.answer != null)
-                        Text(
-                          "Answer: ${q.answer}",
-                          style: const TextStyle(color: Colors.blue),
-                        )
-                      else if (q.hasAnswer)
-                        const Text(
-                          "Answered",
-                          style: TextStyle(color: Colors.green),
-                        )
-                    ],
+          : Column(
+              children: [
+                // ANSWERING INDICATOR
+                if (_currentlyAnsweringPlayer != null)
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    margin: const EdgeInsets.only(top: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      "${_currentlyAnsweringPlayer!} is answering…",
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
                   ),
-                );
-              },
+
+                // TYPING INDICATOR
+                if (_currentlyAnsweringPlayer == null &&
+                    _currentlyTypingPlayer != null)
+                  Padding(
+                    padding: const EdgeInsets.all(8),
+                    child: TypingIndicator(
+                      playerName: _currentlyTypingPlayer!,
+                    ),
+                  ),
+
+                // QUESTION LIST
+                Expanded(
+                  child: ListView.builder(
+                    itemCount: _questions.length,
+                    itemBuilder: (context, index) {
+                      final q = _questions[index];
+
+                      return ListTile(
+                        title: Text("${q.asker} → ${q.target}"),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(q.text),
+                            if (q.answer != null)
+                              Text(
+                                "Answer: ${q.answer}",
+                                style: const TextStyle(color: Colors.blue),
+                              )
+                            else if (q.hasAnswer)
+                              const Text(
+                                "Answered",
+                                style: TextStyle(color: Colors.green),
+                              ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
             ),
     );
   }

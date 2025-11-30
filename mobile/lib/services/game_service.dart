@@ -1,6 +1,5 @@
 import 'package:imposter_game/utils/api_client.dart';
 import 'package:imposter_game/models/round.dart';
-import 'package:imposter_game/models/player.dart';
 
 class GameService {
   static Future<GameRound> startGame(int lobbyId) async {
