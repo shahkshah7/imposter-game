@@ -3,36 +3,31 @@ import 'package:imposter_game/services/lobby_service.dart';
 import 'package:imposter_game/models/player.dart';
 import 'package:imposter_game/models/lobby.dart';
 import 'package:imposter_game/screens/lobby_room/lobby_room_screen.dart';
-import 'package:imposter_game/screens/create_lobby/create_lobby_screen.dart';
 
-class JoinLobbyScreen extends StatefulWidget {
-  const JoinLobbyScreen({super.key});
+class CreateLobbyScreen extends StatefulWidget {
+  const CreateLobbyScreen({super.key});
 
   @override
-  State<JoinLobbyScreen> createState() => _JoinLobbyScreenState();
+  State<CreateLobbyScreen> createState() => _CreateLobbyScreenState();
 }
 
-class _JoinLobbyScreenState extends State<JoinLobbyScreen> {
-  final _codeController = TextEditingController();
+class _CreateLobbyScreenState extends State<CreateLobbyScreen> {
   final _nameController = TextEditingController();
-
   bool _loading = false;
   String? _error;
 
-  void _joinLobby() async {
+  void _createLobby() async {
     setState(() {
       _loading = true;
       _error = null;
     });
 
     try {
-      final code = _codeController.text.trim().toUpperCase();
       final name = _nameController.text.trim();
+      final result = await LobbyService.createLobby(name);
 
-      final result = await LobbyService.joinLobby(code, name);
-
-      final player = result['player'] as Player;
-      final lobby = result['lobby'] as Lobby;
+      final Player player = result['player'];
+      final Lobby lobby = result['lobby'];
 
       if (!mounted) return;
       Navigator.push(
@@ -55,48 +50,29 @@ class _JoinLobbyScreenState extends State<JoinLobbyScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Join Lobby")),
+      appBar: AppBar(title: const Text("Create Lobby")),
       body: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
             TextField(
-              controller: _codeController,
-              decoration: const InputDecoration(
-                labelText: "Lobby Code",
-              ),
-            ),
-            TextField(
               controller: _nameController,
-              decoration: const InputDecoration(
-                labelText: "Player Name",
-              ),
+              decoration: const InputDecoration(labelText: "Your Name"),
             ),
-
             const SizedBox(height: 20),
-
             _loading
                 ? const CircularProgressIndicator()
                 : ElevatedButton(
-                    onPressed: _joinLobby,
-                    child: const Text("Join"),
+                    onPressed: _createLobby,
+                    child: const Text("Create Lobby"),
                   ),
-            const SizedBox(height: 12),
-            TextButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const CreateLobbyScreen()),
-                );
-              },
-              child: const Text("Create Lobby instead"),
-            ),
-
             if (_error != null)
               Padding(
                 padding: const EdgeInsets.only(top: 12),
-                child: Text(_error!,
-                    style: const TextStyle(color: Colors.red)),
+                child: Text(
+                  _error!,
+                  style: const TextStyle(color: Colors.red),
+                ),
               ),
           ],
         ),

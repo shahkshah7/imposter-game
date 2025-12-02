@@ -10,15 +10,16 @@ use Illuminate\Http\Request;
 
 class GameController extends Controller
 {
-    public function startGame($lobbyId)
+    public function startGame($code)
     {
-        $lobby = Lobby::findOrFail($lobbyId);
+        $lobby = Lobby::where('code', strtoupper($code))->firstOrFail();
+        $lobbyId = $lobby->id;
 
         $players = Player::where('lobby_id', $lobbyId)->get();
 
         if ($players->count() < 3) {
             return response()->json([
-                'error' => 'Not enough players'
+                'error' => 'Not enough players (minimum 3 required)'
             ], 400);
         }
 
@@ -27,6 +28,11 @@ class GameController extends Controller
 
         // pick word pair
         $pair = WordPair::inRandomOrder()->first();
+        if (!$pair) {
+            return response()->json([
+                'error' => 'No word pairs available'
+            ], 400);
+        }
 
         $round = Round::create([
             'lobby_id' => $lobbyId,
@@ -37,9 +43,9 @@ class GameController extends Controller
         // assign words to players
         foreach ($players as $p) {
             if ($p->id == $impostor->id) {
-                $p->update(['word' => $pair->fake_word]);   // impostor gets fake
+                $p->update(['word' => $pair->impostor_word]);   // impostor gets impostor word
             } else {
-                $p->update(['word' => $pair->real_word]);   // civilians get real
+                $p->update(['word' => $pair->civilian_word]);   // civilians get civilian word
             }
         }
 

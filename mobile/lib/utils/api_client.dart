@@ -1,14 +1,16 @@
-import 'dart:io';
+import 'dart:io' show Platform;
 import 'package:dio/dio.dart';
 
 class ApiClient {
+  static final String _baseUrl = Platform.isAndroid
+      ? "http://10.0.2.2:8000/api"
+      : "http://127.0.0.1:8000/api";
+
   static final Dio dio = Dio(
     BaseOptions(
-      baseUrl: Platform.isAndroid
-          ? "http://10.0.2.2:8000/api"
-          : "http://127.0.0.1:8000/api",
-      connectTimeout: Duration(seconds: 5),
-      receiveTimeout: Duration(seconds: 5),
+      baseUrl: _baseUrl,
+      connectTimeout: const Duration(seconds: 5),
+      receiveTimeout: const Duration(seconds: 5),
       headers: {"Accept": "application/json"},
     ),
   );
@@ -17,19 +19,24 @@ class ApiClient {
     String path, {
     dynamic data,
     Map<String, dynamic>? queryParameters,
-    Options? options,
-    CancelToken? cancelToken,
-    ProgressCallback? onSendProgress,
-    ProgressCallback? onReceiveProgress,
-  }) {
-    return dio.post(
-      path,
-      data: data,
-      queryParameters: queryParameters,
-      options: options,
-      cancelToken: cancelToken,
-      onSendProgress: onSendProgress,
-      onReceiveProgress: onReceiveProgress,
-    );
+  }) async {
+    try {
+      print("➡️ API REQUEST: POST $_baseUrl$path");
+      print("Body: $data");
+
+      final response = await dio.post(
+        path,
+        data: data,
+        queryParameters: queryParameters,
+      );
+
+      print("⬅️ API RESPONSE: ${response.statusCode}");
+      print(response.data);
+
+      return response;
+    } on DioException catch (e) {
+      print(" API ERROR: $e");
+      rethrow;
+    }
   }
 }

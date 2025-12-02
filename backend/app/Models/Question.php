@@ -15,6 +15,12 @@ class Question extends Model
         'answered_at'
     ];
 
+    protected $appends = [
+        'round_lobby_id',
+        'target_name',
+        'asker_name',
+    ];
+
     public function round()
     {
         return $this->belongsTo(Round::class);
@@ -28,5 +34,25 @@ class Question extends Model
     public function target()
     {
         return $this->belongsTo(Player::class, 'target_id');
+    }
+
+    // ---------------------------------------------
+    // FEATURE E – Needed by Flutter
+    // ---------------------------------------------
+
+    public function getRoundLobbyIdAttribute()
+    {
+        // round belongs to lobby → round->lobby_id
+        return $this->round ? $this->round->lobby_id : null;
+    }
+
+    public function getTargetNameAttribute()
+    {
+        return $this->target ? $this->target->name : null;
+    }
+
+    public function getAskerNameAttribute()
+    {
+        return $this->asker ? $this->asker->name : null;
     }
 }

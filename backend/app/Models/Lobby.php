@@ -8,6 +8,11 @@ class Lobby extends Model
 {
     protected $fillable = ['code', 'host_id'];
 
+    public function setCodeAttribute($value)
+    {
+        $this->attributes['code'] = strtoupper($value);
+    }
+
     public function players()
     {
         return $this->hasMany(Player::class);

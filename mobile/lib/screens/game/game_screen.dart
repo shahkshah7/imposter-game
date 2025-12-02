@@ -6,7 +6,6 @@ import 'package:imposter_game/models/lobby.dart';
 import 'package:imposter_game/models/question.dart';
 import 'package:imposter_game/services/question_service.dart';
 import 'package:imposter_game/screens/game/widgets/ask_question_dialog.dart';
-import 'package:pusher_channels_flutter/pusher_channels_flutter.dart';
 import 'package:imposter_game/services/websocket_service.dart';
 import 'package:imposter_game/screens/game/widgets/answer_dialog.dart';
 import 'package:imposter_game/screens/game/voting_screen.dart';
@@ -76,66 +75,10 @@ class _GameScreenState extends State<GameScreen> {
     if (Platform.isAndroid || Platform.isIOS) {
       WebSocketService.subscribeToLobby(
         widget.lobby.id,
-        (PusherEvent event) {
-          print("WebSocket EVENT: ${event.eventName}");
-          print("DATA: ${event.data}");
-
-          // ---------------- VOTE PHASE ----------------
-          if (event.eventName == "App\\Events\\VotePhaseStarted") {
-            _goToVotingScreen();
-            return;
-          }
-
-          // ---------------- TYPING START ----------------
-          if (event.eventName == "typing.start") {
-            final data = event.data;
-            if (data["player"] != widget.player.name) {
-              setState(() => _currentlyTypingPlayer = data["player"]);
-            }
-            return;
-          }
-
-          // ---------------- TYPING STOP ----------------
-          if (event.eventName == "typing.stop") {
-            final data = event.data;
-            if (_currentlyTypingPlayer == data["player"]) {
-              setState(() => _currentlyTypingPlayer = null);
-            }
-            return;
-          }
-
-          // ---------------- ANSWERING START ----------------
-          if (event.eventName == "answering.start") {
-            final data = event.data;
-
-            if (data["player"] != widget.player.name) {
-              setState(() => _currentlyAnsweringPlayer = data["player"]);
-            }
-
-            // hide typing indicator during answer
-            setState(() => _currentlyTypingPlayer = null);
-            return;
-          }
-
-          // ---------------- ANSWERING STOP ----------------
-          if (event.eventName == "answering.stop") {
-            final data = event.data;
-
-            if (_currentlyAnsweringPlayer == data["player"]) {
-              setState(() => _currentlyAnsweringPlayer = null);
-            }
-
-            return;
-          }
-
-          // ---------------- QUESTION ASKED / ANSWERED ----------------
-          if (event.eventName == "App\\Events\\QuestionAsked" ||
-              event.eventName == "App\\Events\\QuestionAnswered") {
-            _loadQuestions();
-            return;
-          }
-
-          // fallback
+        (event) {
+          try {
+            print("WS EVENT (stub): $event");
+          } catch (_) {}
           _loadQuestions();
         },
       );

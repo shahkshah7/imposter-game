@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:imposter_game/models/player.dart';
 import 'package:imposter_game/services/player_service.dart';
 import 'package:imposter_game/services/question_service.dart';
+import 'package:imposter_game/services/websocket_service.dart';
 
 class AskQuestionDialog extends StatefulWidget {
   final int lobbyId;
@@ -28,6 +29,9 @@ class _AskQuestionDialogState extends State<AskQuestionDialog> {
   bool _loadingPlayers = true;
   String? _error;
 
+  // 🔹 STEP 2: Track typing state
+  bool _isTyping = false;
+
   @override
   void initState() {
     super.initState();
@@ -53,19 +57,69 @@ class _AskQuestionDialogState extends State<AskQuestionDialog> {
     }
   }
 
-  Future<void> _sendQuestion() async {
-    if (_selectedTargetId == null) return;
-    if (_questionController.text.trim().isEmpty) return;
+  // 🔹 STEP 2: Detect start/stop typing
+void _onTypingChanged(String value) {
+  final bool nowTyping = value.isNotEmpty;
 
-    await QuestionService.askQuestion(
-      widget.roundId,
-      widget.currentPlayer.id,
-      _selectedTargetId!,
-      _questionController.text.trim(),
+  if (nowTyping && !_isTyping) {
+    _isTyping = true;
+
+    // 🔥 Broadcast typing START
+    WebSocketService.broadcastTyping(
+      lobbyId: widget.lobbyId,
+      playerName: widget.currentPlayer.name,
+      isTyping: true,
+    );
+  }
+
+  if (!nowTyping && _isTyping) {
+    _isTyping = false;
+
+    // 🔥 Broadcast typing STOP
+    WebSocketService.broadcastTyping(
+      lobbyId: widget.lobbyId,
+      playerName: widget.currentPlayer.name,
+      isTyping: false,
+    );
+  }
+}
+
+
+Future<void> _sendQuestion() async {
+  if (_selectedTargetId == null) return;
+  if (_questionController.text.trim().isEmpty) return;
+
+  await QuestionService.askQuestion(
+    widget.roundId,
+    widget.currentPlayer.id,
+    _selectedTargetId!,
+    _questionController.text.trim(),
     );
 
-    widget.onQuestionSent();
-    if (mounted) Navigator.pop(context);
+  // 🔥 stop typing when question sent
+  _isTyping = false;
+  WebSocketService.broadcastTyping(
+    lobbyId: widget.lobbyId,
+    playerName: widget.currentPlayer.name,
+    isTyping: false,
+  );
+
+  widget.onQuestionSent();
+  if (mounted) Navigator.pop(context);
+}
+
+
+  @override
+  void dispose() {
+    // If user closes dialog mid-typing, reset state
+    _isTyping = false;
+    _questionController.dispose();
+    super.dispose();
+      WebSocketService.broadcastTyping(
+        lobbyId: widget.lobbyId,
+        playerName: widget.currentPlayer.name,
+        isTyping: false,
+      );
   }
 
   @override
@@ -90,6 +144,7 @@ class _AskQuestionDialogState extends State<AskQuestionDialog> {
                   ),
                 TextField(
                   controller: _questionController,
+                  onChanged: _onTypingChanged, // 🔹 STEP 2: added
                   decoration: const InputDecoration(
                     labelText: "Enter question",
                   ),

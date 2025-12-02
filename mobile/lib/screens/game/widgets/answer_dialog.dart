@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:imposter_game/models/question.dart';
 import 'package:imposter_game/services/question_service.dart';
+import 'package:imposter_game/services/websocket_service.dart';
 
-class AnswerDialog extends StatelessWidget {
+class AnswerDialog extends StatefulWidget {
   final Question question;
   final Function onAnswered;
 
@@ -12,6 +13,11 @@ class AnswerDialog extends StatelessWidget {
     required this.onAnswered,
   });
 
+  @override
+  State<AnswerDialog> createState() => _AnswerDialogState();
+}
+
+class _AnswerDialogState extends State<AnswerDialog> {
   final List<String> presetAnswers = const [
     "Yes",
     "No",
@@ -22,10 +28,44 @@ class AnswerDialog extends StatelessWidget {
   ];
 
   @override
+  void initState() {
+    super.initState();
+
+    // Debug print
+    print("START ANSWERING → ${widget.question.target} (lobby ${widget.question.roundLobbyId})");
+
+    // Begin answering indicator
+    if (widget.question.roundLobbyId != null) {
+      WebSocketService.broadcastAnswering(
+        lobbyId: widget.question.roundLobbyId!,
+        playerName: widget.question.target,
+        isAnswering: true,
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    // Debug print
+    print("STOP ANSWERING → ${widget.question.target}");
+
+    // Stop answering indicator
+    if (widget.question.roundLobbyId != null) {
+      WebSocketService.broadcastAnswering(
+        lobbyId: widget.question.roundLobbyId!,
+        playerName: widget.question.target,
+        isAnswering: false,
+      );
+    }
+
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: Text("Question from ${question.asker}"),
-      content: Text(question.text),
+      title: Text("Question from ${widget.question.asker}"),
+      content: Text(widget.question.text),
       actions: [
         Wrap(
           spacing: 8,
@@ -33,9 +73,19 @@ class AnswerDialog extends StatelessWidget {
           children: presetAnswers.map((answer) {
             return ElevatedButton(
               onPressed: () async {
-                await QuestionService.answerQuestion(question.id, answer);
+                await QuestionService.answerQuestion(widget.question.id, answer);
+
+                // Stop answering on submit
+                if (widget.question.roundLobbyId != null) {
+                  WebSocketService.broadcastAnswering(
+                    lobbyId: widget.question.roundLobbyId!,
+                    playerName: widget.question.target,
+                    isAnswering: false,
+                  );
+                }
+
                 Navigator.pop(context);
-                onAnswered();
+                widget.onAnswered();
               },
               child: Text(answer),
             );

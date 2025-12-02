@@ -28,8 +28,7 @@ class _LobbyRoomScreenState extends State<LobbyRoomScreen> {
     });
 
     try {
-      final round =
-          await GameService.startGame(widget.lobby.id);
+      final round = await GameService.startGame(widget.lobby.code);
 
       Navigator.pushReplacement(
         context,
@@ -43,7 +42,7 @@ class _LobbyRoomScreenState extends State<LobbyRoomScreen> {
       );
     } catch (e) {
       setState(() {
-        _error = "Failed to start game.";
+        _error = e.toString();
         _starting = false;
       });
     }
@@ -51,7 +50,7 @@ class _LobbyRoomScreenState extends State<LobbyRoomScreen> {
 
   @override
   Widget build(BuildContext context) {
-    bool isHost = widget.player.id == widget.lobby.id;
+    final bool isHost = widget.player.id == widget.lobby.hostId;
 
     return Scaffold(
       appBar: AppBar(title: Text("Lobby: ${widget.lobby.code}")),
